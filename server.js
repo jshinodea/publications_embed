@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 // Cache for publications data
 let publicationsCache = null;
 let lastCacheUpdate = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // Enable CORS
 app.use((req, res, next) => {
@@ -78,39 +78,47 @@ app.get('/api/publications', async (req, res) => {
         // Filter publications based on search
         let filtered = publications;
         if (search) {
-            const searchLower = search.toLowerCase();
-            filtered = publications.filter(pub => 
-                pub.title.toLowerCase().includes(searchLower) ||
-                pub.authors.toLowerCase().includes(searchLower) ||
-                (pub.journal && pub.journal.toLowerCase().includes(searchLower))
-            );
+            const searchTerms = search.toLowerCase().split(/\s+/);
+            filtered = publications.filter(pub => {
+                const titleLower = pub.title.toLowerCase();
+                const authorsLower = pub.authors.toLowerCase();
+                const journalLower = (pub.journal || '').toLowerCase();
+                
+                return searchTerms.every(term =>
+                    titleLower.includes(term) ||
+                    authorsLower.includes(term) ||
+                    journalLower.includes(term)
+                );
+            });
         }
 
-        // Sort publications
-        filtered.sort((a, b) => {
-            let comparison = 0;
-            switch (sort) {
-                case 'time':
-                    comparison = (b.timestamp || 0) - (a.timestamp || 0);
-                    break;
-                case 'title':
-                    comparison = (a.title || '').localeCompare(b.title || '');
-                    break;
-                case 'author':
-                    comparison = (a.authors || '').localeCompare(b.authors || '');
-                    break;
-                case 'citations':
-                    comparison = (b.citations || 0) - (a.citations || 0);
-                    break;
-            }
-            return direction === 'asc' ? comparison : -comparison;
-        });
+        // Sort publications only if needed
+        if (sort !== 'time' || direction !== 'asc') {
+            filtered.sort((a, b) => {
+                let comparison = 0;
+                switch (sort) {
+                    case 'time':
+                        comparison = (b.timestamp || 0) - (a.timestamp || 0);
+                        break;
+                    case 'title':
+                        comparison = (a.title || '').localeCompare(b.title || '');
+                        break;
+                    case 'author':
+                        comparison = (a.authors || '').localeCompare(b.authors || '');
+                        break;
+                    case 'citations':
+                        comparison = (b.citations || 0) - (a.citations || 0);
+                        break;
+                }
+                return direction === 'asc' ? comparison : -comparison;
+            });
+        }
 
         // Calculate pagination
-        const startIndex = (page - 1) * limit;
-        const endIndex = page * limit;
         const totalItems = filtered.length;
         const totalPages = Math.ceil(totalItems / limit);
+        const startIndex = (page - 1) * limit;
+        const endIndex = Math.min(startIndex + limit, totalItems);
 
         // Get paginated results
         const paginatedResults = filtered.slice(startIndex, endIndex);
@@ -119,13 +127,13 @@ app.get('/api/publications', async (req, res) => {
         let result = paginatedResults;
         if (group === 'year') {
             const grouped = {};
-            paginatedResults.forEach(pub => {
+            for (const pub of paginatedResults) {
                 const year = pub.year || 'Unknown Year';
                 if (!grouped[year]) {
                     grouped[year] = [];
                 }
                 grouped[year].push(pub);
-            });
+            }
 
             // Convert grouped object to array and sort years
             result = Object.entries(grouped)

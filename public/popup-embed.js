@@ -4,6 +4,40 @@
         ? 'http://localhost:3000'
         : 'https://publications-embed.onrender.com';
 
+    // Cache configuration
+    const CACHE_KEY = 'publications_cache';
+    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+    // Cache management functions
+    function getCache() {
+        try {
+            const cache = localStorage.getItem(CACHE_KEY);
+            if (!cache) return null;
+
+            const { timestamp, data } = JSON.parse(cache);
+            if (Date.now() - timestamp > CACHE_DURATION) {
+                localStorage.removeItem(CACHE_KEY);
+                return null;
+            }
+
+            return data;
+        } catch (error) {
+            console.warn('Error reading cache:', error);
+            return null;
+        }
+    }
+
+    function setCache(data) {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                timestamp: Date.now(),
+                data
+            }));
+        } catch (error) {
+            console.warn('Error setting cache:', error);
+        }
+    }
+
     // Create and inject styles for popup
     function injectStyles() {
         const styles = `
@@ -196,38 +230,69 @@
         popup.style.top = `${top}px`;
     }
 
+    // Filter and sort publications client-side
+    function filterPublications(publications, searchTerm) {
+        const searchTerms = searchTerm.toLowerCase().split(/\s+/);
+        return publications
+            .filter(pub => {
+                const titleLower = (pub.title || '').toLowerCase();
+                const authorsLower = (pub.authors || '').toLowerCase();
+                const journalLower = (pub.journal || '').toLowerCase();
+                
+                return searchTerms.every(term =>
+                    titleLower.includes(term) ||
+                    authorsLower.includes(term) ||
+                    journalLower.includes(term)
+                );
+            })
+            .sort((a, b) => (b.citations || 0) - (a.citations || 0))
+            .slice(0, 50);
+    }
+
     // Fetch and display publications for popup
     async function fetchPopupPublications(searchTerm, popup) {
         popup.innerHTML = '<div class="publications-popup-loading">Loading publications...</div>';
         
         try {
-            const params = new URLSearchParams({
-                search: searchTerm,
-                limit: 50,
-                sort: 'citations',
-                direction: 'desc',
-                group: 'none'
-            });
+            // Try to get from cache first
+            let publications = getCache();
 
-            const response = await fetch(`${SERVER_URL}/api/publications?${params}`);
-            const result = await response.json();
+            if (!publications) {
+                // If not in cache, fetch from server
+                const response = await fetch(`${SERVER_URL}/api/publications?limit=1000`);
+                const result = await response.json();
+                publications = result.data;
+                
+                // Store in cache
+                if (publications && publications.length > 0) {
+                    setCache(publications);
+                }
+            }
 
-            if (!result.data || result.data.length === 0) {
+            if (!publications || publications.length === 0) {
                 popup.innerHTML = '<div class="publications-popup-loading">No publications found</div>';
                 return;
             }
 
-            // Filter out publications without URLs and add header
-            const publications = result.data
+            // Filter and process publications client-side
+            const filtered = filterPublications(publications, searchTerm);
+
+            if (filtered.length === 0) {
+                popup.innerHTML = '<div class="publications-popup-loading">No matching publications found</div>';
+                return;
+            }
+
+            // Render filtered publications
+            const publicationsHtml = filtered
                 .filter(pub => pub.url && pub.url !== '#')
                 .map(pub => renderPopupPublication(pub))
                 .join('');
 
             popup.innerHTML = `
                 <div class="publications-popup-header">
-                    Found ${result.data.length} related publications
+                    Found ${filtered.length} related publications
                 </div>
-                ${publications}
+                ${publicationsHtml}
             `;
         } catch (error) {
             console.error('Error fetching publications:', error);

@@ -9,99 +9,103 @@ class BibParseError extends Error {
   }
 }
 
+// Cache regex patterns
+const FIELD_REGEX_CACHE = {};
+const CITATIONS_REGEX = /Cited by (\d+|None)/;
+
+function getFieldRegex(fieldName) {
+  if (!FIELD_REGEX_CACHE[fieldName]) {
+    FIELD_REGEX_CACHE[fieldName] = new RegExp(`${fieldName}\\s*=\\s*{([^}]*)}`, 'i');
+  }
+  return FIELD_REGEX_CACHE[fieldName];
+}
+
 function extractField(entry, fieldName) {
-  const regex = new RegExp(`${fieldName}\\s*=\\s*{([^}]*)}`, 'i');
+  const regex = getFieldRegex(fieldName);
   const match = entry.match(regex);
   return match ? match[1].trim() : null;
 }
 
 function parseCitations(note) {
   if (!note) return 0;
-  const match = note.match(/Cited by (\d+|None)/);
-  if (!match) return 0;
-  return match[1] === 'None' ? 0 : parseInt(match[1]);
+  const match = note.match(CITATIONS_REGEX);
+  return match ? (match[1] === 'None' ? 0 : parseInt(match[1])) : 0;
 }
 
+// Cache month names mapping
+const MONTH_NAMES = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11
+};
+
 function extractDate(entry) {
-  // Try to get month and day from the entry
-  const month = extractField(entry, 'month');
-  const day = extractField(entry, 'day');
   const year = extractField(entry, 'year');
-  
   if (!year) return null;
 
-  // Convert month name to number if present
-  let monthNum = null;
-  if (month) {
-    const monthNames = {
-      jan: 0, january: 0,
-      feb: 1, february: 1,
-      mar: 2, march: 2,
-      apr: 3, april: 3,
-      may: 4,
-      jun: 5, june: 5,
-      jul: 6, july: 6,
-      aug: 7, august: 7,
-      sep: 8, september: 8,
-      oct: 9, october: 9,
-      nov: 10, november: 10,
-      dec: 11, december: 11
-    };
-    monthNum = monthNames[month.toLowerCase()];
-  }
-
-  // Create a date object
-  const date = new Date(year, monthNum || 0, day || 1);
-  return date.getTime(); // Return timestamp for easy sorting
+  const month = extractField(entry, 'month');
+  const day = extractField(entry, 'day');
+  
+  const monthNum = month ? MONTH_NAMES[month.toLowerCase()] : 0;
+  return new Date(year, monthNum || 0, day || 1).getTime();
 }
 
 function parseBibTeXContent(content) {
   try {
     logger.info('Starting BibTeX parsing');
     
-    const entries = content.split('@').filter(entry => entry.trim());
-    const publications = [];
+    // Split content more efficiently
+    const entries = content.split('\n@').filter(entry => entry.trim());
+    const publications = new Array(entries.length);
+    let validCount = 0;
     
-    entries.forEach((entry, index) => {
+    for (let i = 0; i < entries.length; i++) {
       try {
+        const entry = entries[i];
+        
         // Extract fields directly from BibTeX entry
         const title = extractField(entry, 'title') || 'Untitled';
         const authors = extractField(entry, 'author') || 'Unknown Authors';
         const year = extractField(entry, 'year') || 'Unknown Year';
-        const journal = extractField(entry, 'journal') || 'Unknown Journal';
+        const journal = extractField(entry, 'journal') || '';
         const note = extractField(entry, 'note');
         const url = extractField(entry, 'url') || '#';
-        
-        // Get publication date
         const timestamp = extractDate(entry);
         
-        // Store the raw BibTeX entry
-        const rawBibtex = '@' + entry.trim();
-
-        publications.push({
+        publications[validCount++] = {
           id: uuidv4(),
-          title: title,
-          authors: authors.replace(/\s+/g, ' '), // Clean up extra whitespace
-          year: year,
-          journal: journal,
+          title,
+          authors: authors.replace(/\s+/g, ' '),
+          year,
+          journal,
           citations: parseCitations(note),
-          url: url,
-          bibtex: rawBibtex,
-          timestamp: timestamp // Add timestamp for sorting
-        });
+          url,
+          bibtex: (i === 0 ? '@' : '\n@') + entry.trim(),
+          timestamp
+        };
       } catch (error) {
-        logger.warn(`Error parsing entry at index ${index}`, { error: error.message });
+        logger.warn(`Error parsing entry at index ${i}`, { error: error.message });
       }
-    });
+    }
     
-    // Sort publications by timestamp before returning
+    // Trim array to actual size and sort
+    publications.length = validCount;
     publications.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     
-    if (publications.length === 0) {
+    if (validCount === 0) {
       throw new BibParseError('No valid publications found in file', 'NO_VALID_PUBLICATIONS');
     }
     
-    logger.info(`Successfully parsed ${publications.length} publications`);
+    logger.info(`Successfully parsed ${validCount} publications`);
     return publications;
   } catch (error) {
     logger.error('BibTeX parsing failed', { error: error.message });
