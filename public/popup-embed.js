@@ -232,19 +232,41 @@
 
     // Filter and sort publications client-side
     function filterPublications(publications, searchTerm) {
+        console.log('Filtering publications:', { 
+            total: publications.length,
+            searchTerm,
+            samplePub: publications[0]
+        });
+
         const searchTerms = searchTerm.toLowerCase().split(/\s+/);
-        return publications
-            .filter(pub => {
-                const titleLower = (pub.title || '').toLowerCase();
-                const authorsLower = (pub.authors || '').toLowerCase();
-                const journalLower = (pub.journal || '').toLowerCase();
-                
-                return searchTerms.every(term =>
-                    titleLower.includes(term) ||
-                    authorsLower.includes(term) ||
-                    journalLower.includes(term)
-                );
-            })
+        const filtered = publications.filter(pub => {
+            const titleLower = (pub.title || '').toLowerCase();
+            const authorsLower = (pub.authors || '').toLowerCase();
+            const journalLower = (pub.journal || '').toLowerCase();
+            
+            // More lenient search - match any term
+            const matches = searchTerms.some(term =>
+                titleLower.includes(term) ||
+                authorsLower.includes(term) ||
+                journalLower.includes(term)
+            );
+
+            if (matches) {
+                console.log('Matched publication:', { 
+                    title: pub.title,
+                    searchTerm 
+                });
+            }
+
+            return matches;
+        });
+
+        console.log('Filter results:', {
+            searchTerm,
+            matchCount: filtered.length
+        });
+
+        return filtered
             .sort((a, b) => (b.citations || 0) - (a.citations || 0))
             .slice(0, 50);
     }

@@ -133,7 +133,9 @@ app.get('/api/publications', async (req, res) => {
             const minimalResults = paginatedResults.map(pub => ({
                 id: pub.id,
                 title: pub.title,
+                authors: pub.authors,
                 year: pub.year,
+                journal: pub.journal,
                 url: pub.url
             }));
 
