@@ -1,0 +1,4 @@
+1|// Cache for publications data
+2|let publicationsCache = null;
+3|let lastCacheUpdate = null;
+4|const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes 

@@ -1,0 +1,5 @@
+1|app.use((req, res, next) => {
+2|    res.header('Access-Control-Allow-Origin', '*');
+3|    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+4|    next();
+5|}); 
