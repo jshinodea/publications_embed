@@ -3,7 +3,7 @@
     // Get server URL based on environment
     const SERVER_URL = window.location.hostname === 'localhost' 
         ? 'http://localhost:3000'
-        : 'https://your-render-app-name.onrender.com'; // Replace with your actual Render URL
+        : 'https://publications-embed.onrender.com'; // Updated with actual Render URL
 
     // Create and inject styles
     function injectStyles() {
