@@ -51,9 +51,6 @@
                                 <span>Year</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
-                            <button class="direction-btn" title="Toggle group direction" data-direction="desc">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-                            </button>
                             <div class="dropdown-content">
                                 <a href="#" data-group="year">Year</a>
                                 <a href="#" data-group="none">None</a>
@@ -368,20 +365,13 @@
             });
         });
 
-        // Direction buttons
-        document.querySelectorAll('.direction-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const isSort = btn.closest('.dropdown').querySelector('.sort-button');
-                if (isSort) {
-                    state.direction = state.direction === 'asc' ? 'desc' : 'asc';
-                    btn.dataset.direction = state.direction;
-                } else {
-                    state.groupDirection = state.groupDirection === 'asc' ? 'desc' : 'asc';
-                    btn.dataset.direction = state.groupDirection;
-                }
-                fetchPublications();
-            });
+        // Direction button (sort only)
+        const sortDirectionBtn = document.querySelector('.sort-button').nextElementSibling;
+        sortDirectionBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            state.direction = state.direction === 'asc' ? 'desc' : 'asc';
+            sortDirectionBtn.dataset.direction = state.direction;
+            fetchPublications();
         });
 
         // Search input
