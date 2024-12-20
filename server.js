@@ -1,10 +1,14 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const compression = require('compression');
 const { parseBibTeXContent } = require('./bibParser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Enable compression
+app.use(compression());
 
 // Cache for publications data
 let publicationsCache = null;
@@ -61,6 +65,7 @@ app.get('/api/publications', async (req, res) => {
         const direction = req.query.direction || 'asc';
         const group = req.query.group || 'year';
         const search = req.query.search || '';
+        const mode = req.query.mode || 'full'; // 'full' or 'minimal'
 
         const publications = await getPublications();
         if (!publications || publications.length === 0) {
@@ -122,6 +127,26 @@ app.get('/api/publications', async (req, res) => {
 
         // Get paginated results
         const paginatedResults = filtered.slice(startIndex, endIndex);
+
+        // Return minimal data if requested
+        if (mode === 'minimal') {
+            const minimalResults = paginatedResults.map(pub => ({
+                id: pub.id,
+                title: pub.title,
+                year: pub.year,
+                url: pub.url
+            }));
+
+            return res.json({
+                data: minimalResults,
+                pagination: {
+                    page,
+                    limit,
+                    totalItems,
+                    totalPages
+                }
+            });
+        }
 
         // Group publications if needed
         let result = paginatedResults;
