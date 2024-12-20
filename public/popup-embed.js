@@ -276,102 +276,38 @@
         popup.innerHTML = '<div class="publications-popup-loading">Loading publications...</div>';
         
         try {
-            // Try to get from cache first
-            let publications = getCache();
-
-            if (!publications) {
-                // First fetch minimal data quickly
-                const minimalParams = new URLSearchParams({
-                    limit: 1000,
-                    mode: 'minimal'
-                });
-                
-                const minimalResponse = await fetch(`${SERVER_URL}/api/publications?${minimalParams}`);
-                const minimalResult = await minimalResponse.json();
-                
-                if (minimalResult.data && minimalResult.data.length > 0) {
-                    // Show minimal results immediately
-                    const filtered = filterPublications(minimalResult.data, searchTerm);
-                    showMinimalResults(filtered, popup);
-                    
-                    // Then fetch full data in the background
-                    const fullParams = new URLSearchParams({
-                        limit: 1000,
-                        mode: 'full'
-                    });
-                    
-                    const fullResponse = await fetch(`${SERVER_URL}/api/publications?${fullParams}`);
-                    const fullResult = await fullResponse.json();
-                    publications = fullResult.data;
-                    
-                    // Store in cache
-                    if (publications && publications.length > 0) {
-                        setCache(publications);
-                    }
-                    
-                    // Update display with full data
-                    const fullFiltered = filterPublications(publications, searchTerm);
-                    showFullResults(fullFiltered, popup);
-                } else {
-                    popup.innerHTML = '<div class="publications-popup-loading">No publications found</div>';
-                    return;
-                }
-            } else {
-                // Use cached data
-                const filtered = filterPublications(publications, searchTerm);
-                showFullResults(filtered, popup);
+            // Fetch publications with server-side search
+            const params = new URLSearchParams({
+                search: searchTerm,
+                limit: 50,
+                sort: 'citations',
+                direction: 'desc'
+            });
+            
+            const response = await fetch(`${SERVER_URL}/api/publications?${params}`);
+            const result = await response.json();
+            
+            if (!result.data || result.data.length === 0) {
+                popup.innerHTML = '<div class="publications-popup-loading">No matching publications found</div>';
+                return;
             }
+
+            // Render the publications
+            const publicationsHtml = result.data
+                .filter(pub => pub.url && pub.url !== '#')
+                .map(pub => renderPopupPublication(pub))
+                .join('');
+
+            popup.innerHTML = `
+                <div class="publications-popup-header">
+                    Found ${result.data.length} related publications
+                </div>
+                ${publicationsHtml}
+            `;
         } catch (error) {
             console.error('Error fetching publications:', error);
             popup.innerHTML = '<div class="publications-popup-loading">Error loading publications</div>';
         }
-    }
-
-    // Show minimal results while loading
-    function showMinimalResults(publications, popup) {
-        if (publications.length === 0) {
-            popup.innerHTML = '<div class="publications-popup-loading">No matching publications found</div>';
-            return;
-        }
-
-        const publicationsHtml = publications
-            .filter(pub => pub.url && pub.url !== '#')
-            .map(pub => `
-                <div class="popup-publication" onclick="window.open('${pub.url}', '_blank')">
-                    <div class="popup-title">${pub.title}</div>
-                    <div class="popup-meta">
-                        <div class="popup-year">${pub.year}</div>
-                    </div>
-                </div>
-            `)
-            .join('');
-
-        popup.innerHTML = `
-            <div class="publications-popup-header">
-                Found ${publications.length} related publications
-            </div>
-            ${publicationsHtml}
-        `;
-    }
-
-    // Show full results once loaded
-    function showFullResults(publications, popup) {
-        if (publications.length === 0) {
-            popup.innerHTML = '<div class="publications-popup-loading">No matching publications found</div>';
-            return;
-        }
-
-        const publicationsHtml = publications
-            .filter(pub => pub.url && pub.url !== '#')
-            .map(pub => renderPopupPublication(pub))
-            .join('');
-
-        popup.innerHTML = `
-            <div class="publications-popup-header">
-                Found ${publications.length} related publications
-            </div>
-            ${publicationsHtml}
-        `;
     }
 
     // Initialize popup functionality
