@@ -148,6 +148,7 @@
 
             years.forEach(year => {
                 const yearPubs = publications.filter(pub => pub.year === year);
+                const totalCitations = yearPubs.reduce((sum, pub) => sum + (pub.citations || 0), 0);
                 let yearGroup = document.querySelector(`.year-group[data-year="${year}"]`);
                 
                 if (!yearGroup) {
@@ -161,7 +162,7 @@
                         <div class="year-header" onclick="toggleGroup(this)">
                             <div>${year}</div>
                             <div style="display: flex; align-items: center; gap: 12px;">
-                                <span>${yearPubs.length} publications</span>
+                                <span>${yearPubs.length} ${yearPubs.length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}</span>
                                 <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
@@ -176,7 +177,7 @@
                     // Update existing year group
                     const pubsContainer = yearGroup.querySelector('.publications-container');
                     pubsContainer.innerHTML = yearPubs.map(pub => renderPublicationCard(pub)).join('');
-                    yearGroup.querySelector('.year-header span').textContent = `${yearPubs.length} publications`;
+                    yearGroup.querySelector('.year-header span').textContent = `${yearPubs.length} ${yearPubs.length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}`;
                 }
             });
         } else {
