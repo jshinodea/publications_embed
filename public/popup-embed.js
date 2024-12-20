@@ -4,40 +4,6 @@
         ? 'http://localhost:3000'
         : 'https://publications-embed.onrender.com';
 
-    // Cache configuration
-    const CACHE_KEY = 'publications_cache';
-    const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
-
-    // Cache management functions
-    function getCache() {
-        try {
-            const cache = localStorage.getItem(CACHE_KEY);
-            if (!cache) return null;
-
-            const { timestamp, data } = JSON.parse(cache);
-            if (Date.now() - timestamp > CACHE_DURATION) {
-                localStorage.removeItem(CACHE_KEY);
-                return null;
-            }
-
-            return data;
-        } catch (error) {
-            console.warn('Error reading cache:', error);
-            return null;
-        }
-    }
-
-    function setCache(data) {
-        try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({
-                timestamp: Date.now(),
-                data
-            }));
-        } catch (error) {
-            console.warn('Error setting cache:', error);
-        }
-    }
-
     // Create and inject styles for popup
     function injectStyles() {
         const styles = `
@@ -177,27 +143,6 @@
         document.head.appendChild(styleSheet);
     }
 
-    // Render a compact publication card for popup
-    function renderPopupPublication(pub) {
-        // Ensure we have valid data or fallbacks
-        const title = pub.title || 'Untitled';
-        const authors = pub.authors || 'Unknown Authors';
-        const year = pub.year || '';
-        const url = pub.url && pub.url !== '#' ? pub.url : null;
-
-        if (!url) return ''; // Skip publications without URLs
-
-        return `
-            <div class="popup-publication" onclick="window.open('${url}', '_blank')">
-                <div class="popup-title">${title}</div>
-                <div class="popup-meta">
-                    <div class="popup-authors">${authors}</div>
-                    <div class="popup-year">${year}</div>
-                </div>
-            </div>
-        `;
-    }
-
     // Create popup container
     function createPopup() {
         const popup = document.createElement('div');
@@ -230,47 +175,6 @@
         popup.style.top = `${top}px`;
     }
 
-    // Filter and sort publications client-side
-    function filterPublications(publications, searchTerm) {
-        console.log('Filtering publications:', { 
-            total: publications.length,
-            searchTerm,
-            samplePub: publications[0]
-        });
-
-        const searchTerms = searchTerm.toLowerCase().split(/\s+/);
-        const filtered = publications.filter(pub => {
-            const titleLower = (pub.title || '').toLowerCase();
-            const authorsLower = (pub.authors || '').toLowerCase();
-            const journalLower = (pub.journal || '').toLowerCase();
-            
-            // More lenient search - match any term
-            const matches = searchTerms.some(term =>
-                titleLower.includes(term) ||
-                authorsLower.includes(term) ||
-                journalLower.includes(term)
-            );
-
-            if (matches) {
-                console.log('Matched publication:', { 
-                    title: pub.title,
-                    searchTerm 
-                });
-            }
-
-            return matches;
-        });
-
-        console.log('Filter results:', {
-            searchTerm,
-            matchCount: filtered.length
-        });
-
-        return filtered
-            .sort((a, b) => (b.citations || 0) - (a.citations || 0))
-            .slice(0, 50);
-    }
-
     // Fetch and display publications for popup
     async function fetchPopupPublications(searchTerm, popup) {
         popup.innerHTML = '<div class="publications-popup-loading">Loading publications...</div>';
@@ -281,7 +185,8 @@
                 search: searchTerm,
                 limit: 50,
                 sort: 'citations',
-                direction: 'desc'
+                direction: 'desc',
+                group: 'none'  // Ensure we get a flat list of publications
             });
             
             const response = await fetch(`${SERVER_URL}/api/publications?${params}`);
@@ -292,12 +197,18 @@
                 return;
             }
 
-            // Render the publications
-            const publicationsHtml = result.data
-                .filter(pub => pub.url && pub.url !== '#')
-                .map(pub => renderPopupPublication(pub))
-                .join('');
+            // Generate HTML for each publication
+            const publicationsHtml = result.data.map(pub => `
+                <div class="popup-publication" onclick="window.open('${pub.url}', '_blank')">
+                    <div class="popup-title">${pub.title}</div>
+                    <div class="popup-meta">
+                        <div class="popup-authors">${pub.authors}</div>
+                        <div class="popup-year">${pub.year}</div>
+                    </div>
+                </div>
+            `).join('');
 
+            // Update popup content
             popup.innerHTML = `
                 <div class="publications-popup-header">
                     Found ${result.data.length} related publications
