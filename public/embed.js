@@ -10,6 +10,7 @@
         publications: [],
         sort: 'time',
         direction: 'desc', // Default to descending (newer first)
+        groupDirection: 'desc', // Separate state for group ordering
         group: 'year',
         search: '',
         page: 1,
@@ -138,17 +139,18 @@
         const container = document.getElementById('publications-list');
         const spinner = document.getElementById('loading-spinner');
         
-        if (!append) {
-            container.innerHTML = '';
-        }
-
         // Store collapsed state before re-rendering
         const collapsedYears = new Set();
         document.querySelectorAll('.year-group').forEach(group => {
-            if (group.classList.contains('collapsed')) {
-                collapsedYears.add(group.querySelector('.year-header').textContent.trim().split(' ')[0]);
+            const yearHeader = group.querySelector('.year-header');
+            if (yearHeader && group.classList.contains('collapsed')) {
+                collapsedYears.add(yearHeader.querySelector('div').textContent.trim());
             }
         });
+
+        if (!append) {
+            container.innerHTML = '';
+        }
 
         let publications = state.publications;
 
@@ -198,13 +200,14 @@
             // Create a document fragment to hold all year groups
             const fragment = document.createDocumentFragment();
 
-            // Sort and render year groups (always in descending order)
+            // Sort and render year groups (order depends on sort field and direction)
             Object.keys(grouped)
                 .sort((a, b) => {
                     if (a === 'Unknown Year') return 1;
                     if (b === 'Unknown Year') return -1;
-                    // Always sort years in descending order (newer years first)
-                    return b - a;
+                    // Use groupDirection for year ordering
+                    const comparison = b - a;
+                    return state.groupDirection === 'asc' ? -comparison : comparison;
                 })
                 .forEach(year => {
                     const yearGroup = document.createElement('div');
@@ -216,8 +219,8 @@
                     const totalCitations = grouped[year].reduce((sum, pub) => sum + (pub.citations || 0), 0);
                     yearGroup.innerHTML = `
                         <div class="year-header" onclick="toggleGroup(this)">
-                            <div>${year}</div>
-                            <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="year-label">${year}</div>
+                            <div class="year-stats">
                                 <span>${grouped[year].length} ${grouped[year].length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}</span>
                                 <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -323,7 +326,9 @@
                         .sort(([yearA], [yearB]) => {
                             if (yearA === 'Unknown Year') return 1;
                             if (yearB === 'Unknown Year') return -1;
-                            return yearB - yearA;
+                            // Use groupDirection for year ordering
+                            const comparison = yearB - yearA;
+                            return state.groupDirection === 'asc' ? -comparison : comparison;
                         })
                         .flatMap(([_, pubs]) => pubs);
                 } else {
@@ -424,7 +429,12 @@
         document.querySelectorAll('[data-sort]').forEach(option => {
             option.addEventListener('click', (e) => {
                 e.preventDefault();
-                state.sort = e.target.dataset.sort;
+                const newSort = e.target.dataset.sort;
+                // If switching to time sort, sync group direction with current direction
+                if (newSort === 'time' && state.sort !== 'time') {
+                    state.groupDirection = state.direction;
+                }
+                state.sort = newSort;
                 updateButtonText('sort', state.sort);
                 e.target.closest('.dropdown').classList.remove('active');
                 fetchPublications();
@@ -447,6 +457,10 @@
         sortDirectionBtn.addEventListener('click', (e) => {
             e.preventDefault();
             state.direction = state.direction === 'asc' ? 'desc' : 'asc';
+            // Only update group direction when sorting by date
+            if (state.sort === 'time') {
+                state.groupDirection = state.direction;
+            }
             sortDirectionBtn.dataset.direction = state.direction;
             fetchPublications();
         });

@@ -277,37 +277,58 @@
 
 /* Year groups */
 .year-group {
-    margin-bottom: 32px;
+    margin-bottom: 2rem;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .year-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 1rem 1.5rem;
     background: #f8f9fa;
-    border-radius: 8px;
-    margin-bottom: 16px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-weight: 500;
-    color: #2c3e50;
+    user-select: none;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
 }
 
 .year-header:hover {
-    background: #e9ecef;
+    background: #f1f3f5;
 }
 
-.year-header .chevron {
-    transition: transform 0.2s ease;
+.year-label {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #343a40;
+}
+
+.year-stats {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.year-group.collapsed .publications-container {
+    display: none;
 }
 
 .year-group.collapsed .chevron {
     transform: rotate(-90deg);
 }
 
-.year-group.collapsed .publications-container {
-    display: none;
+.chevron {
+    transition: transform 0.2s ease;
+}
+
+.publications-container {
+    padding: 1rem;
+    background: #fff;
 }
 
 /* Loading spinner */
