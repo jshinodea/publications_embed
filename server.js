@@ -46,7 +46,8 @@ async function getPublications() {
             citations: pub.citations || 0,
             url: pub.url || '#',
             bibtex: pub.bibtex || '',
-            timestamp: pub.timestamp || 0
+            timestamp: pub.timestamp || 0,
+            time: pub.time || 0
         }));
 
         return publicationsCache;
@@ -97,25 +98,36 @@ app.get('/api/publications', async (req, res) => {
             });
         }
 
-        // Sort publications
-        filtered.sort((a, b) => {
-            let comparison = 0;
-            switch (sort) {
-                case 'time':
-                    comparison = (b.time || 0) - (a.time || 0);
-                    break;
-                case 'title':
-                    comparison = (a.title || '').localeCompare(b.title || '');
-                    break;
-                case 'author':
-                    comparison = (a.authors || '').localeCompare(b.authors || '');
-                    break;
-                case 'citations':
-                    comparison = (b.citations || 0) - (a.citations || 0);
-                    break;
-            }
-            return direction === 'asc' ? -comparison : comparison;
-        });
+        // Apply sorting
+        if (sort) {
+            filtered.sort((a, b) => {
+                let comparison = 0;
+                switch (sort) {
+                    case 'time':
+                        // For time sorting, preserve the original order from citations.bib
+                        // Use a more precise comparison to avoid floating-point issues
+                        comparison = (b.time || 0) - (a.time || 0);
+                        if (comparison === 0) {
+                            // If times are equal (shouldn't happen with our new time field),
+                            // fallback to year comparison
+                            const yearA = parseInt(a.year) || 0;
+                            const yearB = parseInt(b.year) || 0;
+                            comparison = yearB - yearA;
+                        }
+                        break;
+                    case 'title':
+                        comparison = a.title.localeCompare(b.title);
+                        break;
+                    case 'author':
+                        comparison = a.authors.localeCompare(b.authors);
+                        break;
+                    case 'citations':
+                        comparison = (b.citations || 0) - (a.citations || 0);
+                        break;
+                }
+                return direction === 'asc' ? -comparison : comparison;
+            });
+        }
 
         // Calculate pagination
         const totalItems = filtered.length;
@@ -161,13 +173,14 @@ app.get('/api/publications', async (req, res) => {
                 grouped[year].push(pub);
             }
 
-            // Sort publications within each year group by time
+            // Sort publications within each year group
             for (const year in grouped) {
                 grouped[year].sort((a, b) => {
                     let comparison = 0;
                     switch (sort) {
                         case 'time':
-                            comparison = b.time - a.time;
+                            // For time sorting, preserve the original order from citations.bib
+                            comparison = (b.time || 0) - (a.time || 0);
                             break;
                         case 'title':
                             comparison = a.title.localeCompare(b.title);
@@ -176,7 +189,7 @@ app.get('/api/publications', async (req, res) => {
                             comparison = a.authors.localeCompare(b.authors);
                             break;
                         case 'citations':
-                            comparison = b.citations - a.citations;
+                            comparison = (b.citations || 0) - (a.citations || 0);
                             break;
                     }
                     return direction === 'asc' ? -comparison : comparison;

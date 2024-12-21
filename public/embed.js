@@ -154,20 +154,50 @@
 
         let publications = state.publications;
 
-        // Filter publications if search term exists
-        if (state.search) {
+        // Filter publications based on search
+        let filteredPubs = publications.filter(pub => {
             const searchLower = state.search.toLowerCase();
-            publications = publications.filter(pub => {
-                return pub.title.toLowerCase().includes(searchLower) ||
-                       pub.authors.toLowerCase().includes(searchLower) ||
-                       pub.journal.toLowerCase().includes(searchLower);
+            return pub.title.toLowerCase().includes(searchLower) ||
+                   pub.authors.toLowerCase().includes(searchLower) ||
+                   pub.journal.toLowerCase().includes(searchLower);
+        });
+
+        // Sort publications
+        if (state.sort === 'time') {
+            // For time sorting, preserve the original order from citations.bib
+            filteredPubs.sort((a, b) => {
+                let comparison = (b.time || 0) - (a.time || 0);
+                if (comparison === 0) {
+                    // If times are equal (shouldn't happen with our new time field),
+                    // fallback to year comparison
+                    const yearA = parseInt(a.year) || 0;
+                    const yearB = parseInt(b.year) || 0;
+                    comparison = yearB - yearA;
+                }
+                return state.direction === 'asc' ? -comparison : comparison;
+            });
+        } else {
+            filteredPubs.sort((a, b) => {
+                let comparison = 0;
+                switch (state.sort) {
+                    case 'title':
+                        comparison = a.title.localeCompare(b.title);
+                        break;
+                    case 'author':
+                        comparison = a.authors.localeCompare(b.authors);
+                        break;
+                    case 'citations':
+                        comparison = (b.citations || 0) - (a.citations || 0);
+                        break;
+                }
+                return state.direction === 'asc' ? -comparison : comparison;
             });
         }
 
         // Group publications if needed
         if (state.group === 'year') {
             const grouped = {};
-            publications.forEach(pub => {
+            filteredPubs.forEach(pub => {
                 const year = pub.year || 'Unknown Year';
                 if (!grouped[year]) {
                     grouped[year] = [];
@@ -177,24 +207,29 @@
 
             // Sort publications within each year by selected criteria
             for (const year in grouped) {
-                grouped[year].sort((a, b) => {
-                    let comparison = 0;
-                    switch (state.sort) {
-                        case 'time':
-                            comparison = b.time - a.time;
-                            break;
-                        case 'title':
-                            comparison = a.title.localeCompare(b.title);
-                            break;
-                        case 'author':
-                            comparison = a.authors.localeCompare(b.authors);
-                            break;
-                        case 'citations':
-                            comparison = b.citations - a.citations;
-                            break;
-                    }
-                    return state.direction === 'asc' ? -comparison : comparison;
-                });
+                if (state.sort === 'time') {
+                    // For time sorting, preserve the original order from citations.bib
+                    grouped[year].sort((a, b) => {
+                        const comparison = (b.time || 0) - (a.time || 0);
+                        return state.direction === 'asc' ? -comparison : comparison;
+                    });
+                } else {
+                    grouped[year].sort((a, b) => {
+                        let comparison = 0;
+                        switch (state.sort) {
+                            case 'title':
+                                comparison = a.title.localeCompare(b.title);
+                                break;
+                            case 'author':
+                                comparison = a.authors.localeCompare(b.authors);
+                                break;
+                            case 'citations':
+                                comparison = (b.citations || 0) - (a.citations || 0);
+                                break;
+                        }
+                        return state.direction === 'asc' ? -comparison : comparison;
+                    });
+                }
             }
 
             // Create a document fragment to hold all year groups
@@ -237,33 +272,13 @@
             // Add all year groups to the container at once
             container.appendChild(fragment);
         } else {
-            // Sort publications by selected criteria
-            publications.sort((a, b) => {
-                let comparison = 0;
-                switch (state.sort) {
-                    case 'time':
-                        comparison = b.time - a.time;
-                        break;
-                    case 'title':
-                        comparison = a.title.localeCompare(b.title);
-                        break;
-                    case 'author':
-                        comparison = a.authors.localeCompare(b.authors);
-                        break;
-                    case 'citations':
-                        comparison = b.citations - a.citations;
-                        break;
-                }
-                return state.direction === 'asc' ? -comparison : comparison;
-            });
-
             if (append) {
-                const newPubs = publications.slice(-20);
+                const newPubs = filteredPubs.slice(-20);
                 newPubs.forEach(pub => {
                     container.insertAdjacentHTML('beforeend', renderPublicationCard(pub));
                 });
             } else {
-                publications.forEach(pub => {
+                filteredPubs.forEach(pub => {
                     container.insertAdjacentHTML('beforeend', renderPublicationCard(pub));
                 });
             }

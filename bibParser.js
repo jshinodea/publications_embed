@@ -68,7 +68,7 @@ function parseBibTeXContent(content) {
     
     // Assign time based on reverse order in file (newer entries first)
     const baseTime = Date.now();
-    const timeIncrement = 1000; // 1 second increment between entries
+    const timeIncrement = 0.001; // Use a tiny increment to preserve order
     
     for (let i = 0; i < entries.length; i++) {
       try {
