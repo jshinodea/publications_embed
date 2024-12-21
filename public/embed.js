@@ -22,6 +22,9 @@
     // Track expanded BibTeX sections
     const expandedBibTexSections = new Set();
 
+    // Track hover states
+    const hoveredElements = new Map();
+
     // Create viewer structure
     function createViewerStructure() {
         const container = document.createElement('div');
@@ -96,7 +99,7 @@
                 margin: 0 auto;
                 padding: 20px;
                 color: var(--text-primary);
-                background: var(--background-light);
+                background: white;
             }
 
             .controls {
@@ -606,6 +609,63 @@
         button.classList.toggle('active');
     };
 
+    // Initialize hover tracking
+    function initHoverTracking() {
+        const container = document.getElementById('publications-list');
+        
+        container.addEventListener('mouseover', (e) => {
+            const pubCard = e.target.closest('.publication-card');
+            const yearGroup = e.target.closest('.year-group');
+            
+            if (pubCard) {
+                hoveredElements.set('publication', pubCard.querySelector('.publication-title').textContent);
+            }
+            if (yearGroup) {
+                const yearLabel = yearGroup.querySelector('.year-label')?.textContent;
+                if (yearLabel) {
+                    hoveredElements.set('yearGroup', yearLabel);
+                }
+            }
+        });
+
+        container.addEventListener('mouseout', (e) => {
+            const pubCard = e.target.closest('.publication-card');
+            const yearGroup = e.target.closest('.year-group');
+            
+            if (pubCard) {
+                hoveredElements.delete('publication');
+            }
+            if (yearGroup) {
+                hoveredElements.delete('yearGroup');
+            }
+        });
+    }
+
+    // Restore hover states after rendering
+    function restoreHoverStates() {
+        // Restore publication card hover
+        const hoveredPubTitle = hoveredElements.get('publication');
+        if (hoveredPubTitle) {
+            const pubCard = Array.from(document.querySelectorAll('.publication-card'))
+                .find(card => card.querySelector('.publication-title').textContent === hoveredPubTitle);
+            if (pubCard) {
+                pubCard.style.transform = 'translateY(-2px)';
+                pubCard.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.08)';
+            }
+        }
+
+        // Restore year group hover
+        const hoveredYear = hoveredElements.get('yearGroup');
+        if (hoveredYear) {
+            const yearGroup = Array.from(document.querySelectorAll('.year-group'))
+                .find(group => group.querySelector('.year-label').textContent === hoveredYear);
+            if (yearGroup) {
+                yearGroup.style.transform = 'translateY(-2px)';
+                yearGroup.style.boxShadow = 'var(--shadow-xl)';
+            }
+        }
+    }
+
     // Render publications
     function renderPublications(append = false) {
         const container = document.getElementById('publications-list');
@@ -767,6 +827,9 @@
                 button.classList.add('active');
             }
         });
+
+        // Restore hover states
+        restoreHoverStates();
     }
 
     // Load more publications
@@ -997,6 +1060,9 @@
             
             // Initialize event listeners
             initEventListeners();
+            
+            // Initialize hover tracking
+            initHoverTracking();
 
             // Setup progressive loading
             setupProgressiveLoading();
