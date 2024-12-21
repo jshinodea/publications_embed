@@ -53,10 +53,8 @@ function extractDate(entry) {
   if (!year) return null;
 
   const month = extractField(entry, 'month');
-  const day = extractField(entry, 'day');
-  
   const monthNum = month ? MONTH_NAMES[month.toLowerCase()] : 0;
-  return new Date(year, monthNum || 0, day || 1).getTime();
+  return new Date(year, monthNum || 0, 1).getTime();
 }
 
 function parseBibTeXContent(content) {
@@ -67,6 +65,10 @@ function parseBibTeXContent(content) {
     const entries = content.split('\n@').filter(entry => entry.trim());
     const publications = new Array(entries.length);
     let validCount = 0;
+    
+    // Assign time based on reverse order in file (newer entries first)
+    const baseTime = Date.now();
+    const timeIncrement = 1000; // 1 second increment between entries
     
     for (let i = 0; i < entries.length; i++) {
       try {
@@ -90,16 +92,18 @@ function parseBibTeXContent(content) {
           citations: parseCitations(note),
           url,
           bibtex: (i === 0 ? '@' : '\n@') + entry.trim(),
-          timestamp
+          timestamp,
+          // Add time property based on file order (newer entries first)
+          time: baseTime - (i * timeIncrement)
         };
-      } catch (error) {
-        logger.warn(`Error parsing entry at index ${i}`, { error: error.message });
+      } catch (err) {
+        logger.error(`Error parsing entry ${i + 1}:`, err);
       }
     }
     
-    // Trim array to actual size and sort
+    // Trim array to actual size and sort by time (newer first)
     publications.length = validCount;
-    publications.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    publications.sort((a, b) => b.time - a.time);
     
     if (validCount === 0) {
       throw new BibParseError('No valid publications found in file', 'NO_VALID_PUBLICATIONS');
@@ -108,12 +112,11 @@ function parseBibTeXContent(content) {
     logger.info(`Successfully parsed ${validCount} publications`);
     return publications;
   } catch (error) {
-    logger.error('BibTeX parsing failed', { error: error.message });
-    throw error;
+    logger.error('Failed to parse BibTeX content:', error);
+    throw new BibParseError('Failed to parse BibTeX content', 'PARSE_ERROR');
   }
 }
 
 module.exports = {
-  parseBibTeXContent,
-  BibParseError
+  parseBibTeXContent
 };

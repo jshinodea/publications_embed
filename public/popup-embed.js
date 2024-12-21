@@ -4,143 +4,12 @@
         ? 'http://localhost:3000'
         : 'https://publications-embed.onrender.com';
 
-    // Create and inject styles for popup
+    // Create and inject styles
     function injectStyles() {
-        const styles = `
-            /* Styles for the trigger elements */
-            [data-publications-search] {
-                display: inline-block;
-                padding: 8px 16px;
-                background-color: #f8f9fa;
-                border: 1px solid #e9ecef;
-                border-radius: 4px;
-                color: #2c3e50;
-                cursor: pointer;
-                margin: 4px;
-                transition: all 0.2s ease;
-            }
-
-            [data-publications-search]:hover {
-                background-color: #e9ecef;
-                border-color: #dee2e6;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-
-            /* Research focus container */
-            .research-focus {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-                padding: 16px;
-            }
-
-            /* Popup styles */
-            .publications-popup {
-                position: fixed;
-                background: white;
-                border: 1px solid rgba(0, 0, 0, 0.1);
-                border-radius: 12px;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-                width: 400px;
-                max-height: 500px;
-                overflow-y: auto;
-                z-index: 1000;
-                display: none;
-                padding: 16px;
-                scrollbar-width: thin;
-                scrollbar-color: #CBD5E0 #F7FAFC;
-            }
-
-            /* Webkit scrollbar styles */
-            .publications-popup::-webkit-scrollbar {
-                width: 6px;
-            }
-
-            .publications-popup::-webkit-scrollbar-track {
-                background: #F7FAFC;
-                border-radius: 3px;
-            }
-
-            .publications-popup::-webkit-scrollbar-thumb {
-                background-color: #CBD5E0;
-                border-radius: 3px;
-                border: 2px solid #F7FAFC;
-            }
-
-            .publications-popup .popup-publication {
-                padding: 12px;
-                margin: 0 -16px;
-                transition: background-color 0.2s ease;
-                cursor: pointer;
-            }
-
-            .publications-popup .popup-publication:hover {
-                background-color: #F8FAFC;
-            }
-
-            .publications-popup .popup-title {
-                font-size: 14px;
-                font-weight: 500;
-                color: #2D3748;
-                margin-bottom: 4px;
-                line-height: 1.4;
-                transition: color 0.2s ease;
-            }
-
-            .publications-popup .popup-publication:hover .popup-title {
-                color: #3182CE;
-            }
-
-            .publications-popup .popup-meta {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 12px;
-                color: #718096;
-            }
-
-            .publications-popup .popup-authors {
-                flex: 1;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            .publications-popup .popup-year {
-                font-weight: 500;
-                color: #4A5568;
-                padding: 2px 6px;
-                background: #EDF2F7;
-                border-radius: 4px;
-                font-size: 11px;
-            }
-
-            .publications-popup:empty {
-                display: none;
-            }
-
-            .publications-popup-loading {
-                text-align: center;
-                padding: 20px;
-                color: #718096;
-                font-size: 14px;
-            }
-
-            .publications-popup-header {
-                margin: -16px -16px 12px -16px;
-                padding: 12px 16px;
-                background: #F8FAFC;
-                border-bottom: 1px solid #E2E8F0;
-                border-radius: 12px 12px 0 0;
-                font-size: 13px;
-                font-weight: 500;
-                color: #4A5568;
-            }
-        `;
-
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = styles;
-        document.head.appendChild(styleSheet);
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `${SERVER_URL}/popup-styles.css`;
+        document.head.appendChild(link);
     }
 
     // Create popup container
@@ -184,8 +53,8 @@
             const params = new URLSearchParams({
                 search: searchTerm,
                 limit: 50,
-                sort: 'citations',
-                direction: 'desc',
+                sort: 'time', // Default to time-based sorting
+                direction: 'desc', // Default to newest first
                 group: 'none'  // Ensure we get a flat list of publications
             });
             

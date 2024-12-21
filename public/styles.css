@@ -255,30 +255,24 @@
     width: 16px;
     height: 16px;
     transition: transform 0.2s ease;
-    stroke: currentColor;
 }
 
-.bibtex-toggle.active svg {
-    transform: rotate(180deg);
-}
-
-/* BibTeX section */
 .bibtex-section {
     display: none;
     margin-top: 16px;
     padding: 16px;
     background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #2c3e50;
+    overflow-x: auto;
 }
 
-.bibtex-content {
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-    font-size: 13px;
-    line-height: 1.6;
-    color: #2c3e50;
-    white-space: pre-wrap;
-    word-break: break-all;
+.bibtex-section.expanded {
+    display: block;
+    animation: fadeIn 0.2s ease;
 }
 
 /* Year groups */
@@ -291,42 +285,40 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    background: #002147;
+    background: #f8f9fa;
     border-radius: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
     transition: all 0.2s ease;
+    font-weight: 500;
+    color: #2c3e50;
 }
 
 .year-header:hover {
-    background: #003166;
+    background: #e9ecef;
+}
+
+.year-header .chevron {
+    transition: transform 0.2s ease;
+}
+
+.year-group.collapsed .chevron {
+    transform: rotate(-90deg);
 }
 
 .year-group.collapsed .publications-container {
     display: none;
 }
 
-.year-group.collapsed .chevron {
-    transform: rotate(180deg);
-}
-
-.chevron {
-    transition: transform 0.3s ease;
-    stroke: #fff;
-}
-
-/* Spinner */
+/* Loading spinner */
 .spinner {
-    width: 30px;
-    height: 30px;
-    border: 3px solid #e9ecef;
-    border-top: 3px solid #002147;
+    width: 40px;
+    height: 40px;
+    margin: 40px auto;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #002147;
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 20px auto;
 }
 
 @keyframes spin {
@@ -335,50 +327,22 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-/* Responsive design */
+/* Responsive adjustments */
 @media (max-width: 768px) {
     .controls {
         flex-direction: column;
-        padding: 16px;
+    }
+
+    .search-input {
+        width: 100%;
     }
 
     .buttons-group {
         flex-wrap: wrap;
-    }
-
-    .dropdown {
-        flex: 1;
-        min-width: 150px;
-    }
-
-    .publication-card {
-        padding: 16px;
-    }
-
-    .publication-meta {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-    }
-
-    .meta-right {
-        width: 100%;
-    }
-
-    .action-buttons {
-        width: 100%;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .publication-link,
-    .bibtex-toggle {
-        width: 100%;
-        justify-content: center;
     }
 
     .publication-title-row {
@@ -390,8 +354,14 @@
         max-width: 100%;
     }
 
-    .publication-link {
-        width: 100%;
-        justify-content: center;
+    .publication-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .meta-left {
+        flex-direction: column;
+        gap: 8px;
     }
 } 

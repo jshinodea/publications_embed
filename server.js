@@ -62,10 +62,10 @@ app.get('/api/publications', async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const sort = req.query.sort || 'time';
-        const direction = req.query.direction || 'asc';
+        const direction = req.query.direction || 'desc';
         const group = req.query.group || 'year';
         const search = req.query.search || '';
-        const mode = req.query.mode || 'full'; // 'full' or 'minimal'
+        const mode = req.query.mode || 'full';
 
         const publications = await getPublications();
         if (!publications || publications.length === 0) {
@@ -97,27 +97,25 @@ app.get('/api/publications', async (req, res) => {
             });
         }
 
-        // Sort publications only if needed
-        if (sort !== 'time' || direction !== 'asc') {
-            filtered.sort((a, b) => {
-                let comparison = 0;
-                switch (sort) {
-                    case 'time':
-                        comparison = (b.timestamp || 0) - (a.timestamp || 0);
-                        break;
-                    case 'title':
-                        comparison = (a.title || '').localeCompare(b.title || '');
-                        break;
-                    case 'author':
-                        comparison = (a.authors || '').localeCompare(b.authors || '');
-                        break;
-                    case 'citations':
-                        comparison = (b.citations || 0) - (a.citations || 0);
-                        break;
-                }
-                return direction === 'asc' ? comparison : -comparison;
-            });
-        }
+        // Sort publications
+        filtered.sort((a, b) => {
+            let comparison = 0;
+            switch (sort) {
+                case 'time':
+                    comparison = (b.time || 0) - (a.time || 0);
+                    break;
+                case 'title':
+                    comparison = (a.title || '').localeCompare(b.title || '');
+                    break;
+                case 'author':
+                    comparison = (a.authors || '').localeCompare(b.authors || '');
+                    break;
+                case 'citations':
+                    comparison = (b.citations || 0) - (a.citations || 0);
+                    break;
+            }
+            return direction === 'asc' ? -comparison : comparison;
+        });
 
         // Calculate pagination
         const totalItems = filtered.length;
@@ -136,7 +134,8 @@ app.get('/api/publications', async (req, res) => {
                 authors: pub.authors,
                 year: pub.year,
                 journal: pub.journal,
-                url: pub.url
+                url: pub.url,
+                time: pub.time
             }));
 
             return res.json({
@@ -150,7 +149,7 @@ app.get('/api/publications', async (req, res) => {
             });
         }
 
-        // Group publications if needed
+        // Group by year if requested
         let result = paginatedResults;
         if (group === 'year') {
             const grouped = {};
@@ -162,12 +161,35 @@ app.get('/api/publications', async (req, res) => {
                 grouped[year].push(pub);
             }
 
-            // Convert grouped object to array and sort years
+            // Sort publications within each year group by time
+            for (const year in grouped) {
+                grouped[year].sort((a, b) => {
+                    let comparison = 0;
+                    switch (sort) {
+                        case 'time':
+                            comparison = b.time - a.time;
+                            break;
+                        case 'title':
+                            comparison = a.title.localeCompare(b.title);
+                            break;
+                        case 'author':
+                            comparison = a.authors.localeCompare(b.authors);
+                            break;
+                        case 'citations':
+                            comparison = b.citations - a.citations;
+                            break;
+                    }
+                    return direction === 'asc' ? -comparison : comparison;
+                });
+            }
+
+            // Convert grouped object to array and sort years in descending order by default
             result = Object.entries(grouped)
                 .sort(([yearA], [yearB]) => {
                     if (yearA === 'Unknown Year') return 1;
                     if (yearB === 'Unknown Year') return -1;
-                    return direction === 'asc' ? yearA - yearB : yearB - yearA;
+                    // Always sort years in descending order (newer years first)
+                    return yearB - yearA;
                 })
                 .map(([year, pubs]) => ({
                     year,

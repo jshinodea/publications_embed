@@ -3,24 +3,24 @@
     // Get server URL based on environment
     const SERVER_URL = window.location.hostname === 'localhost' 
         ? 'http://localhost:3000'
-        : 'https://publications-embed.onrender.com'; // Updated with actual Render URL
+        : 'https://publications-embed.onrender.com';
 
-    // Create and inject styles
-    function injectStyles() {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `${SERVER_URL}/styles.css`;
-        document.head.appendChild(link);
-    }
+    // State management
+    const state = {
+        publications: [],
+        sort: 'time',
+        direction: 'desc', // Default to descending (newer first)
+        group: 'year',
+        search: '',
+        page: 1,
+        loading: false,
+        hasMore: true,
+        cache: new Map() // Cache for instant filtering
+    };
 
     // Create viewer structure
     function createViewerStructure() {
-        const container = document.getElementById('publications-viewer');
-        if (!container) {
-            console.error('Could not find #publications-viewer element');
-            return null;
-        }
-
+        const container = document.createElement('div');
         container.className = 'publications-viewer-container';
         container.innerHTML = `
             <div class="container">
@@ -34,7 +34,7 @@
                                 <span>Date</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
-                            <button class="direction-btn" title="Toggle sort direction" data-direction="asc">
+                            <button class="direction-btn" title="Toggle sort direction" data-direction="desc">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
                             </button>
                             <div class="dropdown-content">
@@ -66,21 +66,16 @@
                 </div>
             </div>
         `;
-
         return container;
     }
 
-    // State management
-    let state = {
-        publications: [],
-        sort: 'time',
-        direction: 'asc',
-        group: 'year',
-        search: '',
-        page: 1,
-        loading: false,
-        hasMore: true
-    };
+    // Create and inject styles
+    function injectStyles() {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `${SERVER_URL}/styles.css`;
+        document.head.appendChild(link);
+    }
 
     // Helper function to escape HTML
     function escapeHtml(text) {
@@ -88,6 +83,27 @@
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // Update button text
+    function updateButtonText(type, value) {
+        const button = document.querySelector(`.dropdown:has([data-${type}]) .btn span`);
+        if (button) {
+            let displayText = value;
+            if (type === 'sort') {
+                displayText = value === 'time' ? 'Date' : 
+                            value.charAt(0).toUpperCase() + value.slice(1);
+            } else if (type === 'group') {
+                displayText = value === 'none' ? 'None' : 'Year';
+            }
+            button.textContent = displayText;
+        }
+    }
+
+    // Toggle group collapse
+    window.toggleGroup = function(header) {
+        const group = header.parentElement;
+        group.classList.toggle('collapsed');
+    };
 
     // Render a publication card
     function renderPublicationCard(pub) {
@@ -134,52 +150,112 @@
             }
         });
 
-        let publications = state.group === 'year' ? state.publications : state.publications;
+        let publications = state.publications;
+
+        // Filter publications if search term exists
+        if (state.search) {
+            const searchLower = state.search.toLowerCase();
+            publications = publications.filter(pub => {
+                return pub.title.toLowerCase().includes(searchLower) ||
+                       pub.authors.toLowerCase().includes(searchLower) ||
+                       pub.journal.toLowerCase().includes(searchLower);
+            });
+        }
 
         // Group publications if needed
         if (state.group === 'year') {
-            // Sort years in descending order
-            const years = [...new Set(publications.map(pub => pub.year))].sort((a, b) => 
-                state.direction === 'asc' ? a - b : b - a
-            );
+            const grouped = {};
+            publications.forEach(pub => {
+                const year = pub.year || 'Unknown Year';
+                if (!grouped[year]) {
+                    grouped[year] = [];
+                }
+                grouped[year].push(pub);
+            });
 
-            years.forEach(year => {
-                const yearPubs = publications.filter(pub => pub.year === year);
-                const totalCitations = yearPubs.reduce((sum, pub) => sum + (pub.citations || 0), 0);
-                let yearGroup = document.querySelector(`.year-group[data-year="${year}"]`);
-                
-                if (!yearGroup) {
-                    yearGroup = document.createElement('div');
+            // Sort publications within each year by selected criteria
+            for (const year in grouped) {
+                grouped[year].sort((a, b) => {
+                    let comparison = 0;
+                    switch (state.sort) {
+                        case 'time':
+                            comparison = b.time - a.time;
+                            break;
+                        case 'title':
+                            comparison = a.title.localeCompare(b.title);
+                            break;
+                        case 'author':
+                            comparison = a.authors.localeCompare(b.authors);
+                            break;
+                        case 'citations':
+                            comparison = b.citations - a.citations;
+                            break;
+                    }
+                    return state.direction === 'asc' ? -comparison : comparison;
+                });
+            }
+
+            // Create a document fragment to hold all year groups
+            const fragment = document.createDocumentFragment();
+
+            // Sort and render year groups (always in descending order)
+            Object.keys(grouped)
+                .sort((a, b) => {
+                    if (a === 'Unknown Year') return 1;
+                    if (b === 'Unknown Year') return -1;
+                    // Always sort years in descending order (newer years first)
+                    return b - a;
+                })
+                .forEach(year => {
+                    const yearGroup = document.createElement('div');
                     yearGroup.className = 'year-group';
-                    yearGroup.setAttribute('data-year', year);
                     if (collapsedYears.has(year)) {
                         yearGroup.classList.add('collapsed');
                     }
+
+                    const totalCitations = grouped[year].reduce((sum, pub) => sum + (pub.citations || 0), 0);
                     yearGroup.innerHTML = `
                         <div class="year-header" onclick="toggleGroup(this)">
                             <div>${year}</div>
                             <div style="display: flex; align-items: center; gap: 12px;">
-                                <span>${yearPubs.length} ${yearPubs.length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}</span>
+                                <span>${grouped[year].length} ${grouped[year].length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}</span>
                                 <svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </div>
                         </div>
                         <div class="publications-container">
-                            ${yearPubs.map(pub => renderPublicationCard(pub)).join('')}
+                            ${grouped[year].map(pub => renderPublicationCard(pub)).join('')}
                         </div>
                     `;
-                    container.appendChild(yearGroup);
-                } else {
-                    // Update existing year group
-                    const pubsContainer = yearGroup.querySelector('.publications-container');
-                    pubsContainer.innerHTML = yearPubs.map(pub => renderPublicationCard(pub)).join('');
-                    yearGroup.querySelector('.year-header span').textContent = `${yearPubs.length} ${yearPubs.length === 1 ? 'publication' : 'publications'} · ${totalCitations} ${totalCitations === 1 ? 'citation' : 'citations'}`;
-                }
-            });
+                    fragment.appendChild(yearGroup);
+                });
+
+            // Add all year groups to the container at once
+            container.appendChild(fragment);
         } else {
+            // Sort publications by selected criteria
+            publications.sort((a, b) => {
+                let comparison = 0;
+                switch (state.sort) {
+                    case 'time':
+                        comparison = b.time - a.time;
+                        break;
+                    case 'title':
+                        comparison = a.title.localeCompare(b.title);
+                        break;
+                    case 'author':
+                        comparison = a.authors.localeCompare(b.authors);
+                        break;
+                    case 'citations':
+                        comparison = b.citations - a.citations;
+                        break;
+                }
+                return state.direction === 'asc' ? -comparison : comparison;
+            });
+
             if (append) {
-                const newPubs = publications.slice(-20); // Get only the new publications
+                const newPubs = publications.slice(-20);
                 newPubs.forEach(pub => {
                     container.insertAdjacentHTML('beforeend', renderPublicationCard(pub));
                 });
@@ -193,31 +269,8 @@
         spinner.style.display = state.loading ? 'block' : 'none';
     }
 
-    // Progressive loading using Intersection Observer
-    function setupProgressiveLoading() {
-        const options = {
-            root: null,
-            rootMargin: '100px',
-            threshold: 0.1
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && !state.loading && state.hasMore) {
-                    loadMore();
-                }
-            });
-        }, options);
-
-        // Observe the spinner element
-        const spinner = document.getElementById('loading-spinner');
-        if (spinner) {
-            observer.observe(spinner);
-        }
-    }
-
     // Load more publications
-    async function loadMore() {
+    async function loadMorePublications() {
         if (state.loading || !state.hasMore) return;
 
         state.loading = true;
@@ -242,18 +295,46 @@
             } else {
                 state.page++;
                 if (state.group === 'year') {
-                    // For grouped data, merge new publications into existing state
+                    // Create a map of existing publications by year
+                    const existingByYear = new Map();
+                    state.publications.forEach(pub => {
+                        const year = pub.year || 'Unknown Year';
+                        if (!existingByYear.has(year)) {
+                            existingByYear.set(year, []);
+                        }
+                        existingByYear.get(year).push(pub);
+                    });
+
+                    // Merge new publications
                     data.data.forEach(group => {
                         if (group.publications) {
-                            group.publications.forEach(pub => {
-                                state.publications.push(pub);
-                            });
+                            const year = group.year;
+                            if (year !== 'Unknown Year' || !existingByYear.has('Unknown Year')) {
+                                if (!existingByYear.has(year)) {
+                                    existingByYear.set(year, []);
+                                }
+                                existingByYear.get(year).push(...group.publications);
+                            }
                         }
                     });
+
+                    // Convert back to array and sort by year
+                    state.publications = Array.from(existingByYear.entries())
+                        .sort(([yearA], [yearB]) => {
+                            if (yearA === 'Unknown Year') return 1;
+                            if (yearB === 'Unknown Year') return -1;
+                            return yearB - yearA;
+                        })
+                        .flatMap(([_, pubs]) => pubs);
                 } else {
                     state.publications = state.publications.concat(data.data);
                 }
-                renderPublications(true);
+                renderPublications();
+
+                // Auto-load more if we still have more to load
+                if (state.hasMore) {
+                    setTimeout(loadMorePublications, 1000); // Load next batch after 1 second
+                }
             }
         } catch (error) {
             console.error('Error loading more publications:', error);
@@ -263,18 +344,11 @@
         }
     }
 
-    // Update button text
-    function updateButtonText(type, value) {
-        const button = document.querySelector(`.dropdown:has([data-${type}]) .btn span`);
-        if (button) {
-            let displayText = value;
-            if (type === 'sort') {
-                displayText = value === 'time' ? 'Date' : 
-                            value.charAt(0).toUpperCase() + value.slice(1);
-            } else if (type === 'group') {
-                displayText = value === 'none' ? 'None' : 'Year';
-            }
-            button.textContent = displayText;
+    // Progressive loading using Intersection Observer
+    function setupProgressiveLoading() {
+        // Start loading more publications automatically
+        if (state.hasMore) {
+            setTimeout(loadMorePublications, 1000);
         }
     }
 
@@ -302,9 +376,7 @@
                 state.publications = [];
                 data.data.forEach(group => {
                     if (group.publications) {
-                        group.publications.forEach(pub => {
-                            state.publications.push(pub);
-                        });
+                        state.publications.push(...group.publications);
                     }
                 });
             } else {
@@ -313,6 +385,11 @@
             
             state.hasMore = data.pagination.totalPages > 1;
             renderPublications();
+
+            // Start progressive loading
+            if (state.hasMore) {
+                setTimeout(loadMorePublications, 1000);
+            }
         } catch (error) {
             console.error('Error fetching publications:', error);
         } finally {
@@ -365,7 +442,7 @@
             });
         });
 
-        // Direction button (sort only)
+        // Direction button
         const sortDirectionBtn = document.querySelector('.sort-button').nextElementSibling;
         sortDirectionBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -374,7 +451,7 @@
             fetchPublications();
         });
 
-        // Search input
+        // Search input with debouncing
         const searchInput = document.getElementById('search');
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {
@@ -390,38 +467,23 @@
             if (e.target.closest('.bibtex-toggle')) {
                 const id = e.target.closest('.bibtex-toggle').dataset.id;
                 const section = document.getElementById(`bibtex-${id}`);
-                if (section) {
-                    section.style.display = section.style.display === 'block' ? 'none' : 'block';
-                }
-            }
-        });
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.dropdown')) {
-                document.querySelectorAll('.dropdown.active').forEach(dropdown => {
-                    dropdown.classList.remove('active');
-                });
+                section.classList.toggle('expanded');
             }
         });
     }
 
-    // Toggle group collapse
-    window.toggleGroup = function(header) {
-        const group = header.parentElement;
-        group.classList.toggle('collapsed');
-    };
-
     // Initialize the viewer
     async function init() {
         try {
+            console.log('Starting initialization...');
+            
             // Inject styles
             injectStyles();
 
             // Create viewer structure
-            const container = createViewerStructure();
-            if (!container) return;
-
+            const viewer = createViewerStructure();
+            document.currentScript.parentNode.insertBefore(viewer, document.currentScript.nextSibling);
+            
             // Initialize event listeners
             initEventListeners();
 

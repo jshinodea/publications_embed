@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="publications-viewer-container">
+    <div id="publications-viewer" class="publications-viewer-container">
         <div class="container">
             <div class="controls">
                 <input type="text" id="search" placeholder="Search publications..." class="search-input">
@@ -36,9 +36,6 @@
                             <span>Year</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
-                        <button class="direction-btn" title="Toggle group direction" data-direction="desc">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-                        </button>
                         <div class="dropdown-content">
                             <a href="#" data-group="year">Year</a>
                             <a href="#" data-group="none">None</a>
@@ -52,14 +49,12 @@
             </div>
 
             <div class="pagination">
-                <button id="load-more" class="btn">Load More</button>
                 <div id="loading-spinner" class="spinner" style="display: none;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Initial state from SSR
         window.__INITIAL_STATE__ = __INITIAL_STATE__;
     </script>
     <script src="/embed.js"></script>
