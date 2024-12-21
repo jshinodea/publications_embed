@@ -91,7 +91,7 @@ function parseBibTeXContent(content) {
           journal,
           citations: parseCitations(note),
           url,
-          bibtex: (i === 0 ? '@' : '\n@') + entry.trim(),
+          bibtex: '@' + entry.trim(),
           timestamp,
           // Add time property based on file order (newer entries first)
           time: baseTime - (i * timeIncrement)

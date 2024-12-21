@@ -221,6 +221,14 @@
     border-color: #90cdf4;
 }
 
+.bibtex-toggle svg {
+    transition: transform 0.2s ease;
+}
+
+.bibtex-toggle.active svg {
+    transform: rotate(180deg);
+}
+
 .bibtex-section {
     display: none;
     margin-top: 16px;
@@ -228,11 +236,16 @@
     background: #f8fafc;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
+}
+
+.bibtex-content {
     font-family: 'SF Mono', 'Consolas', monospace;
     font-size: 14px;
     line-height: 1.6;
     color: #2d3748;
     overflow-x: auto;
+    margin: 0;
+    padding: 0;
 }
 
 /* Year groups */

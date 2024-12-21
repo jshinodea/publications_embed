@@ -19,6 +19,9 @@
         cache: new Map() // Cache for instant filtering
     };
 
+    // Track expanded BibTeX sections
+    const expandedBibTexSections = new Set();
+
     // Create viewer structure
     function createViewerStructure() {
         const container = document.createElement('div');
@@ -38,7 +41,7 @@
                             <button class="direction-btn" title="Toggle sort direction" data-direction="desc">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
                             </button>
-                            <div class="dropdown-content">
+                            <div class="dropdown-content sort-options">
                                 <a href="#" data-sort="time">Date</a>
                                 <a href="#" data-sort="title">Title</a>
                                 <a href="#" data-sort="author">Author</a>
@@ -52,7 +55,7 @@
                                 <span>Year</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
-                            <div class="dropdown-content">
+                            <div class="dropdown-content group-options">
                                 <a href="#" data-group="year">Year</a>
                                 <a href="#" data-group="none">None</a>
                             </div>
@@ -72,10 +75,461 @@
 
     // Create and inject styles
     function injectStyles() {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `${SERVER_URL}/styles.css`;
-        document.head.appendChild(link);
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            :root {
+                --ucd-blue: #002855;
+                --ucd-gold: #FFBF00;
+                --text-primary: #002855;
+                --text-secondary: #4F6379;
+                --background-light: #F7F9FC;
+                --border-color: #E2E8F0;
+                --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+                --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+
+            .publications-viewer-container {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+                color: var(--text-primary);
+                background: var(--background-light);
+            }
+
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 20px;
+                margin-bottom: 30px;
+                background: white;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: var(--shadow-xl);
+                border: 2px solid var(--ucd-blue);
+                position: relative;
+                z-index: 2;
+            }
+
+            .search-input {
+                flex: 1;
+                min-width: 200px;
+                padding: 12px 16px;
+                border: 2px solid var(--border-color);
+                border-radius: 8px;
+                font-size: 16px;
+                transition: all 0.2s ease;
+                color: var(--text-primary);
+            }
+
+            .search-input:focus {
+                outline: none;
+                border-color: var(--ucd-blue);
+                box-shadow: 0 0 0 3px rgba(0, 40, 85, 0.1);
+            }
+
+            .buttons-group {
+                display: flex;
+                gap: 15px;
+            }
+
+            .dropdown {
+                position: relative;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .button-group-label {
+                font-size: 14px;
+                color: var(--text-secondary);
+                font-weight: 500;
+            }
+
+            .btn {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                background: white;
+                border: 2px solid var(--border-color);
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                color: var(--text-primary);
+                font-weight: 500;
+                transition: all 0.2s ease;
+            }
+
+            .btn:hover {
+                border-color: var(--ucd-blue);
+            }
+
+            .direction-btn {
+                padding: 8px;
+                background: white;
+                border: 2px solid var(--border-color);
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .direction-btn:hover {
+                border-color: var(--ucd-blue);
+            }
+
+            .direction-btn svg {
+                width: 16px;
+                height: 16px;
+                stroke: var(--text-secondary);
+            }
+
+            .direction-btn[data-direction="asc"] svg {
+                transform: rotate(180deg);
+            }
+
+            .dropdown-content {
+                display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 0;
+                min-width: 160px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+                border: 1px solid var(--border-color);
+            }
+
+            .dropdown.active .dropdown-content {
+                display: block;
+            }
+
+            .dropdown-content a {
+                display: block;
+                padding: 10px 16px;
+                color: var(--text-primary);
+                text-decoration: none;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }
+
+            .dropdown-content a:hover {
+                background: var(--background-light);
+                color: var(--ucd-blue);
+            }
+
+            .publication-card {
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 16px;
+                border: 1px solid var(--border-color);
+                transition: all 0.2s ease;
+                box-shadow: var(--shadow-sm);
+            }
+
+            .publication-card:hover {
+                box-shadow: var(--shadow-md);
+                transform: translateY(-1px);
+            }
+
+            .publication-title-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 20px;
+                margin-bottom: 16px;
+            }
+
+            .publication-title {
+                font-size: 18px;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin: 0;
+                line-height: 1.4;
+                flex: 1;
+            }
+
+            .publication-link {
+                display: inline-flex;
+                align-items: center;
+                padding: 8px 16px;
+                background: var(--ucd-blue);
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 14px;
+                transition: all 0.2s ease;
+                white-space: nowrap;
+            }
+
+            .publication-link:hover {
+                background: #003875;
+                transform: translateY(-1px);
+            }
+
+            .publication-authors {
+                color: var(--text-secondary);
+                font-size: 14px;
+                margin-bottom: 16px;
+                line-height: 1.6;
+            }
+
+            .publication-meta {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-top: 16px;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .meta-left {
+                display: flex;
+                gap: 16px;
+                align-items: center;
+                color: var(--text-secondary);
+                font-size: 14px;
+            }
+
+            .citation-count {
+                display: inline-flex;
+                align-items: center;
+                padding: 4px 10px;
+                background: rgba(0, 40, 85, 0.1);
+                color: var(--ucd-blue);
+                border-radius: 6px;
+                font-weight: 500;
+            }
+
+            .bibtex-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                color: var(--text-secondary);
+                background: transparent;
+                border: none;
+                padding: 8px 12px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .bibtex-toggle:hover {
+                color: var(--ucd-blue);
+            }
+
+            .bibtex-toggle .chevron-icon {
+                transition: transform 0.2s ease;
+            }
+
+            .bibtex-toggle.active .chevron-icon {
+                transform: rotate(180deg);
+            }
+
+            .bibtex-section {
+                display: none;
+                margin-top: 16px;
+                background: var(--background-light);
+                border-radius: 8px;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+            }
+
+            .bibtex-section.expanded {
+                display: block;
+                animation: slideDown 0.2s ease;
+            }
+
+            .bibtex-header {
+                display: flex;
+                justify-content: flex-end;
+                padding: 8px;
+                background: white;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .copy-button {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                background: white;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                color: var(--text-secondary);
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .copy-button:hover {
+                border-color: var(--ucd-blue);
+                color: var(--ucd-blue);
+            }
+
+            .copy-button svg {
+                width: 14px;
+                height: 14px;
+                stroke: currentColor;
+            }
+
+            .copy-button.copied {
+                background: var(--ucd-blue);
+                color: white;
+                border-color: var(--ucd-blue);
+            }
+
+            .bibtex-content {
+                margin: 0;
+                padding: 16px;
+                font-family: 'SF Mono', 'Consolas', monospace;
+                font-size: 13px;
+                line-height: 1.5;
+                color: var(--text-primary);
+                overflow-x: auto;
+                background: var(--background-light);
+            }
+
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .year-group {
+                margin-bottom: 24px;
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: var(--shadow-lg);
+                border: 2px solid var(--ucd-blue);
+                transition: all 0.2s ease;
+                transform: translateZ(0);
+            }
+
+            .year-group:hover {
+                box-shadow: var(--shadow-xl);
+                transform: translateY(-2px);
+            }
+
+            .year-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 24px;
+                background: var(--ucd-blue);
+                cursor: pointer;
+                user-select: none;
+                transition: all 0.2s ease;
+                position: relative;
+                z-index: 1;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+
+            .year-header:hover {
+                background: #003875;
+            }
+
+            .year-header:after {
+                content: '';
+                position: absolute;
+                bottom: -2px;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background: rgba(0, 0, 0, 0.1);
+            }
+
+            .year-label {
+                font-size: 20px;
+                font-weight: 600;
+                color: white;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            }
+
+            .year-stats {
+                color: var(--ucd-gold);
+                font-size: 14px;
+                font-weight: 500;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            }
+
+            .publications-container {
+                padding: 20px;
+                background: white;
+                position: relative;
+                z-index: 0;
+            }
+
+            .year-group.collapsed .publications-container {
+                display: none;
+            }
+
+            .spinner {
+                width: 40px;
+                height: 40px;
+                margin: 40px auto;
+                border: 4px solid var(--border-color);
+                border-top: 4px solid var(--ucd-blue);
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            @media (max-width: 768px) {
+                .controls {
+                    flex-direction: column;
+                }
+
+                .search-input {
+                    width: 100%;
+                }
+
+                .buttons-group {
+                    flex-wrap: wrap;
+                }
+
+                .publication-title-row {
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .publication-link {
+                    align-self: flex-start;
+                }
+
+                .publication-meta {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+            }
+
+            .chevron {
+                stroke: white;
+                transition: transform 0.2s ease;
+            }
+
+            .year-group.collapsed .chevron {
+                transform: rotate(-90deg);
+            }
+        `;
+        document.head.appendChild(styleSheet);
     }
 
     // Helper function to escape HTML
@@ -120,19 +574,37 @@
                         <span>${pub.journal || ''}</span>
                         <span class="citation-count">${pub.citations || 0} citations</span>
                     </div>
-                    <div class="meta-right">
-                        <button class="bibtex-toggle" data-id="${pub.id}">
-                            <span>BibTeX</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron-down"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                        </button>
-                    </div>
+                    <button class="bibtex-toggle" onclick="toggleBibtex('${pub.id}')" data-id="${pub.id}">
+                        <span>BibTeX</span>
+                        <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
                 </div>
                 <div id="bibtex-${pub.id}" class="bibtex-section">
-                    <div class="bibtex-content">${escapeHtml(pub.bibtex || '')}</div>
+                    <pre class="bibtex-content">${escapeHtml(pub.bibtex || '')}</pre>
                 </div>
             </div>
         `;
     }
+
+    // Toggle BibTeX visibility
+    window.toggleBibtex = function(pubId) {
+        const section = document.getElementById(`bibtex-${pubId}`);
+        const button = section.parentElement.querySelector('.bibtex-toggle');
+        const isVisible = section.style.display === 'block';
+        
+        // Toggle the section display
+        section.style.display = isVisible ? 'none' : 'block';
+        
+        // Track expanded state
+        if (isVisible) {
+            expandedBibTexSections.delete(pubId);
+        } else {
+            expandedBibTexSections.add(pubId);
+        }
+        
+        // Toggle the active class for the button (controls arrow rotation)
+        button.classList.toggle('active');
+    };
 
     // Render publications
     function renderPublications(append = false) {
@@ -285,6 +757,16 @@
         }
 
         spinner.style.display = state.loading ? 'block' : 'none';
+
+        // Restore expanded BibTeX sections after rendering
+        expandedBibTexSections.forEach(pubId => {
+            const section = document.getElementById(`bibtex-${pubId}`);
+            const button = section?.parentElement?.querySelector('.bibtex-toggle');
+            if (section && button) {
+                section.style.display = 'block';
+                button.classList.add('active');
+            }
+        });
     }
 
     // Load more publications
