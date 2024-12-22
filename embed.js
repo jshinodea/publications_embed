@@ -511,10 +511,13 @@
 
         // Filter publications based on search
         let filteredPubs = publications.filter(pub => {
-            const searchLower = searchTerm.toLowerCase();
-            return pub.title.toLowerCase().includes(searchLower) ||
-                   pub.authors.toLowerCase().includes(searchLower) ||
-                   pub.journal.toLowerCase().includes(searchLower);
+            const searchTerms = searchTerm.toLowerCase().split(/\s*,\s*/);
+            return searchTerms.some(term => {
+                const trimmedTerm = term.trim();
+                return pub.title.toLowerCase().includes(trimmedTerm) ||
+                       pub.authors.toLowerCase().includes(trimmedTerm) ||
+                       (pub.journal || '').toLowerCase().includes(trimmedTerm);
+            });
         });
 
         // Sort publications

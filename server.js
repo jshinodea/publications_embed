@@ -84,16 +84,16 @@ app.get('/api/publications', async (req, res) => {
         // Filter publications based on search
         let filtered = publications;
         if (search) {
-            const searchTerms = search.toLowerCase().split(/\s+/);
+            const searchTerms = search.toLowerCase().split(/\s*,\s*/);
             filtered = publications.filter(pub => {
                 const titleLower = pub.title.toLowerCase();
                 const authorsLower = pub.authors.toLowerCase();
                 const journalLower = (pub.journal || '').toLowerCase();
                 
-                return searchTerms.every(term =>
-                    titleLower.includes(term) ||
-                    authorsLower.includes(term) ||
-                    journalLower.includes(term)
+                return searchTerms.some(term =>
+                    titleLower.includes(term.trim()) ||
+                    authorsLower.includes(term.trim()) ||
+                    journalLower.includes(term.trim())
                 );
             });
         }
